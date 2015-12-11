@@ -37,7 +37,7 @@ import static java.lang.Thread.sleep;
  * <a href="http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking">http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking</a>,
  * <a href="http://www.coralblocks.com/NettyBench.zip">http://www.coralblocks.com/NettyBench.zip</a> and
  * <a href="https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA">https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA</a>
- * <p>run: <code>mvn exec:exec -Dbenchmark=netlet.client</code></p>
+ * <p>run: <code>mvn test -Dbenchmark=netlet.client</code></p>
  * <p>results=Iterations: 1000000 | Avg Time: 28.386 micros | Min Time: 15.0 micros | Max Time: 167.0 micros | 75% Time: 28.0 micros | 90% Time: 36.0 micros | 99% Time: 47.0 micros | 99.9% Time: 76.0 micros | 99.99% Time: 94.0 micros | 99.999% Time: 115.0 micros</p>
  */
 public class BenchmarkTcpClient extends AbstractClient
@@ -56,7 +56,7 @@ public class BenchmarkTcpClient extends AbstractClient
 
   private BenchmarkTcpClient(final String host, final int port) throws IOException, InterruptedException
   {
-    super();
+    super(BenchmarkConfiguration.messageSize, 1);
     final Thread eventLoopThread = eventLoop.start();
     eventLoop.connect(new InetSocketAddress(host, port), this);
     eventLoopThread.join();
@@ -87,13 +87,6 @@ public class BenchmarkTcpClient extends AbstractClient
   }
 
   @Override
-  public void unregistered(SelectionKey key)
-  {
-    super.unregistered(key);
-    disconnected();
-  }
-
-  @Override
   public void disconnected()
   {
     logger.info("Disconnected. Overall test time: {} millis", System.currentTimeMillis() - start);
@@ -105,8 +98,8 @@ public class BenchmarkTcpClient extends AbstractClient
   public void read(int len)
   {
     if (readByteBuffer.position() != readByteBuffer.capacity()) {
-      logger.error("Read buffer position {} != capacity {}", readByteBuffer.position(), readByteBuffer.capacity());
-      eventLoop.disconnect(this);
+      //logger.error("Read buffer position {} != capacity {}", readByteBuffer.position(), readByteBuffer.capacity());
+      //eventLoop.disconnect(this);
       return;
     }
 
@@ -174,10 +167,8 @@ public class BenchmarkTcpClient extends AbstractClient
 
   public static void main(String[] args)
   {
-    String host = args[0];
-    int port = Integer.parseInt(args[1]);
     try {
-      new BenchmarkTcpClient(host, port);
+      new BenchmarkTcpClient(args[0], BenchmarkConfiguration.port);
     } catch (IOException e) {
       logger.error("", e);
     } catch (InterruptedException e) {

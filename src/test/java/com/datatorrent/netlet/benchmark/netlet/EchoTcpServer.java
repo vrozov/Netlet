@@ -25,12 +25,12 @@ import java.nio.channels.SocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.datatorrent.netlet.benchmark.util.BenchmarkConfiguration;
-import com.datatorrent.netlet.benchmark.util.BenchmarkResults;
 import com.datatorrent.netlet.AbstractClient;
 import com.datatorrent.netlet.AbstractServer;
 import com.datatorrent.netlet.DefaultEventLoop;
 import com.datatorrent.netlet.EventLoop;
+import com.datatorrent.netlet.benchmark.util.BenchmarkConfiguration;
+import com.datatorrent.netlet.benchmark.util.BenchmarkResults;
 
 import static java.lang.Thread.sleep;
 
@@ -40,7 +40,7 @@ import static java.lang.Thread.sleep;
  * <a href="http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking">http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking</a>,
  * <a href="http://www.coralblocks.com/NettyBench.zip">http://www.coralblocks.com/NettyBench.zip</a> and
  * <a href="https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA">https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA</a>
- * <p>run: <code>mvn exec:exec -Dbenchmark=netlet.server</code></p>
+ * <p>run: <code>mvn test -Dbenchmark=netlet.server</code></p>
  * <p>results=Iterations: 1000000 | Avg Time: 14.274 micros | Min Time: 3.0 micros | Max Time: 125.0 micros | 75% Time: 14.0 micros | 90% Time: 17.0 micros | 99% Time: 24.0 micros | 99.9% Time: 40.0 micros | 99.99% Time: 71.0 micros | 99.999% Time: 81.0 micros</p>
  */
 public class EchoTcpServer extends AbstractServer
@@ -68,7 +68,7 @@ public class EchoTcpServer extends AbstractServer
   public ClientListener getClientConnection(SocketChannel client, final ServerSocketChannel server)
   {
     logger.info("{} connected.", client);
-    return new AbstractClient()
+    return new AbstractClient(BenchmarkConfiguration.sendBufferSize, 1)
     {
       private final ByteBuffer byteBuffer = ByteBuffer.allocate(BenchmarkConfiguration.messageSize);
       private final BenchmarkResults benchmarkResults = new BenchmarkResults(BenchmarkConfiguration.messageCount);
@@ -77,7 +77,6 @@ public class EchoTcpServer extends AbstractServer
       @Override
       public ByteBuffer buffer()
       {
-        byteBuffer.clear();
         return byteBuffer;
       }
 
@@ -98,6 +97,10 @@ public class EchoTcpServer extends AbstractServer
       @Override
       public void read(int len)
       {
+        if (byteBuffer.position() < byteBuffer.capacity()) {
+          return;
+        }
+
         byteBuffer.flip();
         long timestamp = byteBuffer.getLong();
 
@@ -119,8 +122,8 @@ public class EchoTcpServer extends AbstractServer
             sleep(5);
           }
           write();
-        }
-        catch (Exception ie) {
+          byteBuffer.clear();
+        } catch (Exception ie) {
           throw new RuntimeException(ie);
         }
       }
@@ -129,15 +132,8 @@ public class EchoTcpServer extends AbstractServer
 
   public static void main(String[] args)
   {
-    int port;
-    if (args.length > 0) {
-      port = Integer.parseInt(args[0]);
-    } else {
-      port = 8080;
-    }
-
     try {
-      new EchoTcpServer("localhost", port);
+      new EchoTcpServer(null, BenchmarkConfiguration.port);
     } catch (IOException e) {
       logger.error("", e);
     } catch (InterruptedException e) {

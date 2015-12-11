@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -41,30 +41,29 @@ import com.datatorrent.netlet.benchmark.util.BenchmarkResults;
  * <a href="http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking">http://stackoverflow.com/questions/23839437/what-are-the-netty-alternatives-for-high-performance-networking</a>,
  * <a href="http://www.coralblocks.com/NettyBench.zip">http://www.coralblocks.com/NettyBench.zip</a> and
  * <a href="https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA">https://groups.google.com/forum/#!topic/mechanical-sympathy/fhbyMnnxmaA</a>
- * <p>run: <code>mvn exec:exec -Dbenchmark=netty.server</code></p>
+ * <p>run: <code>mvn test -Dbenchmark=netty.server</code></p>
  * <p>results=Iterations: 1000000 | Avg Time: 14.606 micros | Min Time: 0.0 nanos | Max Time: 113.0 micros | 75% Time: 15.0 micros | 90% Time: 17.0 micros | 99% Time: 23.0 micros | 99.9% Time: 34.0 micros | 99.99% Time: 72.0 micros | 99.999% Time: 80.0 micros</p>
  */
-public class EchoTcpServer extends ChannelHandlerAdapter
+public class EchoTcpServer extends ChannelInboundHandlerAdapter
 {
 
-	private static final Logger logger = LoggerFactory.getLogger(EchoTcpServer.class);
+  private static final Logger logger = LoggerFactory.getLogger(EchoTcpServer.class);
 
-	private final BenchmarkResults benchmarkResults = new BenchmarkResults(BenchmarkConfiguration.messageCount);
-	private long start;
+  private final BenchmarkResults benchmarkResults = new BenchmarkResults(BenchmarkConfiguration.messageCount);
+  private long start;
 
-	public EchoTcpServer() throws IOException
+  public EchoTcpServer() throws IOException
   {
-		super();
-	}
-	
+    super();
+  }
+
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
   {
-      // Close the connection when an exception is raised.
-      cause.printStackTrace();
-      ctx.close();
+    logger.error("", cause);
+    ctx.close();
   }
-	
+
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object msg)
   {
@@ -79,45 +78,49 @@ public class EchoTcpServer extends ChannelHandlerAdapter
       logger.info("Received the first message.");
     } else if (timestamp == -2) {
       logger.info("Finished receiving messages! Overall test time: {} millis", System.currentTimeMillis() - start);
+      byteBuf.clear().release();
       ctx.close();
       benchmarkResults.printResults(System.out);
       return;
     } else if (timestamp < 0) {
       logger.error("Received bad timestamp {}", timestamp);
+      byteBuf.clear().release();
       ctx.close();
       return;
     }
 
-		ctx.writeAndFlush(msg);
-	}
-	
-	public static void main(String[] args) throws Exception
-  {
-		int port;
-		if (args.length > 0) {
-				port = Integer.parseInt(args[0]);
-		} else {
-				port = 8080;
-		}
-		
-		EventLoopGroup bossGroup = new NioEventLoopGroup();
-		EventLoopGroup workerGroup = new NioEventLoopGroup();
-		try {
-			ServerBootstrap b = new ServerBootstrap();
-			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
-			        .childHandler(new ChannelInitializer<SocketChannel>() {
-				                @Override
-				                public void initChannel(SocketChannel ch) throws Exception {
-					                ch.pipeline().addLast(new EchoTcpServer());
-				                }
-			                }).option(ChannelOption.SO_BACKLOG, 128)
-			        .childOption(ChannelOption.SO_KEEPALIVE, true);
+    try {
+      ctx.writeAndFlush(msg, ctx.voidPromise()).await();
+    } catch (InterruptedException e) {
+      logger.error("", e);
+      ctx.close();
+    }
+    byteBuf.clear();
+  }
 
-			ChannelFuture f = b.bind(port).sync(); // (7)
-			f.channel().closeFuture().sync();
-		} finally {
-			workerGroup.shutdownGracefully();
-			bossGroup.shutdownGracefully();
-		}
-	}
+  public static void main(String[] args) throws Exception
+  {
+    EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+    EventLoopGroup workerGroup = new NioEventLoopGroup(1);
+    try {
+      ServerBootstrap b = new ServerBootstrap();
+      b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
+          .childHandler(new ChannelInitializer<SocketChannel>()
+          {
+            @Override
+            public void initChannel(SocketChannel ch) throws Exception
+            {
+              ch.pipeline().addLast(new EchoTcpServer());
+            }
+          }).option(ChannelOption.SO_BACKLOG, 128)
+          .childOption(ChannelOption.ALLOCATOR, new SingletonByteBufAllocator())
+          .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+      ChannelFuture f = b.bind(BenchmarkConfiguration.port).sync();
+      f.channel().closeFuture().sync();
+    } finally {
+      workerGroup.shutdownGracefully();
+      bossGroup.shutdownGracefully();
+    }
+  }
 }

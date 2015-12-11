@@ -70,10 +70,16 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <checkstyle.console>false</checkstyle.console>
     <semver.skip>false</semver.skip>
-    <benchmark.count>1000000</benchmark.count>
-    <benchmark.size>256</benchmark.size>
-    <benchmark.host>localhost</benchmark.host>
-    <benchmark.port>8080</benchmark.port>
+    <message.count>1000000</message.count>
+    <message.size>256</message.size>
+    <port>8080</port>
+    <host>localhost</host>
+    <netlet.send.buffer.size.max>1024</netlet.send.buffer.size.max>
+    <gc>-verbose:gc</gc>
+    <heap.max>1g</heap.max>
+    <heap.min>1g</heap.min>
+    <NewSize>512m</NewSize>
+    <MaxNewSize>512m</MaxNewSize>
   </properties>
 
   <build>
@@ -213,13 +219,52 @@
         </executions>
         <configuration>
           <configLocation>netlet_checks.xml</configLocation>
-          <maxAllowedViolations>189</maxAllowedViolations>
+          <maxAllowedViolations>100</maxAllowedViolations>
           <failOnViolation>true</failOnViolation>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
           <logViolationsToConsole>${checkstyle.console}</logViolationsToConsole>
         </configuration>
       </plugin>
     </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>2.19</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>1.4.0</version>
+          <executions>
+            <execution>
+              <phase>test</phase>
+              <goals>
+                <goal>exec</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <executable>java</executable>
+            <arguments combine.children="append">
+              <argument>-server</argument>
+              <argument>${gc}</argument>
+              <argument>-Xms${heap.min}</argument>
+              <argument>-Xmx${heap.max}</argument>
+              <argument>-XX:NewSize=${NewSize}</argument>
+              <argument>-XX:MaxNewSize=${MaxNewSize}</argument>
+              <argument>-cp</argument>
+              <classpath />
+              <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${message.count}</argument>
+              <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${message.size}</argument>
+              <argument>-Dcom.datatorrent.netlet.benchmark.port=${port}</argument>
+            </arguments>
+            <classpathScope>test</classpathScope>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
 
   <reporting>
@@ -334,36 +379,29 @@
           <value>netlet.server</value>
         </property>
       </activation>
+      <properties>
+        <gc>-XX:+PrintGCDetails</gc>
+        <heap.max>2g</heap.max>
+        <heap.min>2g</heap.min>
+        <NewSize>768m</NewSize>
+        <MaxNewSize>768m</MaxNewSize>
+      </properties>
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>1.4.0</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-              </execution>
-            </executions>
             <configuration>
-              <executable>java</executable>
               <arguments>
-                <argument>-server</argument>
-                <argument>-XX:+PrintGCDetails</argument>
-                <argument>-Xms2g</argument>
-                <argument>-Xmx2g</argument>
-                <argument>-XX:NewSize=768m</argument>
-                <argument>-XX:MaxNewSize=768m</argument>
-                <argument>-cp</argument>
-                <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
                 <argument>com.datatorrent.netlet.benchmark.netlet.EchoTcpServer</argument>
-                <argument>${benchmark.port}</argument>
               </arguments>
-              <classpathScope>test</classpathScope>
             </configuration>
           </plugin>
         </plugins>
@@ -377,36 +415,30 @@
           <value>netty.server</value>
         </property>
       </activation>
+      <properties>
+        <gc>-XX:+PrintGCDetails</gc>
+        <heap.max>2g</heap.max>
+        <heap.min>2g</heap.min>
+        <NewSize>768m</NewSize>
+        <MaxNewSize>768m</MaxNewSize>
+      </properties>
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>1.4.0</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-              </execution>
-            </executions>
             <configuration>
-              <executable>java</executable>
               <arguments>
-                <argument>-server</argument>
-                <argument>-XX:+PrintGCDetails</argument>
-                <argument>-Xms2g</argument>
-                <argument>-Xmx2g</argument>
-                <argument>-XX:NewSize=768m</argument>
-                <argument>-XX:MaxNewSize=768m</argument>
-                <argument>-cp</argument>
-                <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>-Dio.netty.leakDetectionLevel=DISABLED</argument>
                 <argument>com.datatorrent.netlet.benchmark.netty.EchoTcpServer</argument>
-                <argument>${benchmark.port}</argument>
               </arguments>
-              <classpathScope>test</classpathScope>
             </configuration>
           </plugin>
         </plugins>
@@ -423,34 +455,20 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>1.4.0</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-              </execution>
-            </executions>
             <configuration>
-              <executable>java</executable>
               <arguments>
-                <argument>-server</argument>
-                <argument>-verbose:gc</argument>
-                <argument>-Xms1g</argument>
-                <argument>-Xmx1g</argument>
-                <argument>-XX:NewSize=512m</argument>
-                <argument>-XX:MaxNewSize=512m</argument>
-                <argument>-cp</argument>
-                <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
                 <argument>com.datatorrent.netlet.benchmark.netlet.BenchmarkTcpClient</argument>
-                <argument>${benchmark.host}</argument>
-                <argument>${benchmark.port}</argument>
+                <argument>${host}</argument>
               </arguments>
-              <classpathScope>test</classpathScope>
             </configuration>
           </plugin>
         </plugins>
@@ -467,34 +485,266 @@
       <build>
         <plugins>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>1.4.0</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-              </execution>
-            </executions>
             <configuration>
-              <executable>java</executable>
               <arguments>
-                <argument>-server</argument>
-                <argument>-verbose:gc</argument>
-                <argument>-Xms1g</argument>
-                <argument>-Xmx1g</argument>
-                <argument>-XX:NewSize=512m</argument>
-                <argument>-XX:MaxNewSize=512m</argument>
-                <argument>-cp</argument>
-                <classpath />
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.count=${benchmark.count}</argument>
-                <argument>-Dcom.datatorrent.netlet.benchmark.message.size=${benchmark.size}</argument>
+                <argument>-Dio.netty.leakDetectionLevel=DISABLED</argument>
                 <argument>com.datatorrent.netlet.benchmark.netty.BenchmarkTcpClient</argument>
-                <argument>${benchmark.host}</argument>
-                <argument>${benchmark.port}</argument>
+                <argument>${host}</argument>
               </arguments>
-              <classpathScope>test</classpathScope>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Netlet Input Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>netlet.input</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Netlet</argument>
+                <argument>-server</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Netlet Output Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>netlet.output</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>-DNETLET.MAX_SENDBUFFER_SIZE=${netlet.send.buffer.size.max}</argument>
+                <argument>com.datatorrent.netlet.benchmark.stream.Netlet</argument>
+                <argument>-client</argument>
+                <argument>${host}</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Netty Input Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>netty.input</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Netty</argument>
+                <argument>-server</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Netty Output Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>netty.output</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Netty</argument>
+                <argument>-client</argument>
+                <argument>${host}</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Channel Input Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>channel.input</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Channel</argument>
+                <argument>-server</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Channel Output Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>channel.output</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Channel</argument>
+                <argument>-client</argument>
+                <argument>${host}</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Socket Input Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>socket.input</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Socket</argument>
+                <argument>-server</argument>
+              </arguments>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>Socket Output Stream</id>
+      <activation>
+        <property>
+          <name>stream</name>
+          <value>socket.output</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>true</skipTests>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <configuration>
+              <arguments>
+                <argument>com.datatorrent.netlet.benchmark.stream.Socket</argument>
+                <argument>-client</argument>
+                <argument>${host}</argument>
+              </arguments>
             </configuration>
           </plugin>
         </plugins>
@@ -523,7 +773,13 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-all</artifactId>
-      <version>5.0.0.Alpha2</version>
+      <version>4.0.36.Final</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.javassist</groupId>
+      <artifactId>javassist</artifactId>
+      <version>3.20.0-GA</version>
       <scope>test</scope>
     </dependency>
     <dependency>

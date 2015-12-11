@@ -96,6 +96,7 @@ public abstract class AbstractClient implements ClientListener
    * so other threads may get stale value.
    */
   protected SelectionKey key = invalidSelectionKey;
+  private boolean bufferIsFullLogged = false;
 
   public boolean isConnected()
   {
@@ -161,23 +162,31 @@ public abstract class AbstractClient implements ClientListener
   @Override
   public final void read() throws IOException
   {
-    SocketChannel channel = (SocketChannel)key.channel();
-    int read;
-    if ((read = channel.read(buffer())) > 0) {
-      this.read(read);
-    }
-    else if (read == -1) {
-      try {
-        channel.close();
+    final SocketChannel channel = (SocketChannel)key.channel();
+    final ByteBuffer buffer = buffer();
+    if (buffer.remaining() == 0) {
+      if (!bufferIsFullLogged) {
+        logger.info("{} buffer {} is full", this, buffer);
+        bufferIsFullLogged = true;
       }
-      finally {
-        disconnected();
-        unregistered(key);
-        key.attach(Listener.NOOP_CLIENT_LISTENER);
+      this.read(0);
+    } else {
+      bufferIsFullLogged = false;
+      int read;
+
+      if ((read = channel.read(buffer())) > 0) {
+        this.read(read);
+      } else if (read == -1) {
+        try {
+          channel.close();
+        } finally {
+          disconnected();
+          unregistered(key);
+          key.attach(Listener.NOOP_CLIENT_LISTENER);
+        }
+      } else {
+        logger.debug("{} read {} bytes", this, read);
       }
-    }
-    else {
-      logger.debug("{} read 0 bytes", this);
     }
   }
 

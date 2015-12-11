@@ -97,6 +97,7 @@
 
     <module name="LineLength">
       <property name="max" value="120"/>
+      <property name="ignorePattern" value="^ *\*.*$"/>
       <property name="severity" value="warning"/>
     </module>
 

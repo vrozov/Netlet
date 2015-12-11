@@ -78,20 +78,20 @@ Performance tests were written to compare the performance of Netlet to that of N
 
 Netlet server and Netlet client can be run by executing the following commands in sequence.
 ```
-mvn exec:exec -Dbenchmark=netlet.server
-mvn exec:exec -Dbenchmark=netlet.client
+mvn test -Dbenchmark=netlet.server
+mvn test -Dbenchmark=netlet.client
 ```
 
 Similarly if you want to benchmark the Netty Client server
 ```
-mvn exec:exec -Dbenchmark=netty.server
-mvn exec:exec -Dbenchmark=netty.client
+mvn test -Dbenchmark=netty.server
+mvn test -Dbenchmark=netty.client
 ```
 
 And you can mix and match server and client programs 
 ```
-mvn exec:exec -Dbenchmark=netlet.server
-mvn exec:exec -Dbenchmark=netty.client
+mvn test -Dbenchmark=netlet.server
+mvn test -Dbenchmark=netty.client
 ```
 
 ##Downloads##

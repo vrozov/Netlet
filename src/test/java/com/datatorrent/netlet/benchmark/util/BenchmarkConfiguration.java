@@ -28,11 +28,27 @@ public class BenchmarkConfiguration
 {
   private static final Logger logger = LoggerFactory.getLogger(BenchmarkConfiguration.class);
 
-  public static final String messageCountName = "com.datatorrent.netlet.benchmark.message.count";
-  public static final String messageSizeName = "com.datatorrent.netlet.benchmark.message.size";
+  private static final String prefix = "com.datatorrent.netlet.benchmark.";
+  public static final String portName = prefix + "port";
+  public static final String sleepName = prefix + "sleep";
+  public static final String messageCountName = prefix + "message.count";
+  public static final String messageSizeName = prefix + "message.size";
+  public static final String bytesCountName = prefix + "bytes.count";
+  public static final String receiveBufferSizeName = prefix + "receiveBufferSize";
+  public static final String sendBufferSizeName = prefix + "sendBufferSize";
+  public static final String socketReceiveBufferSizeName = prefix + "SO_RCVBUF";
+  public static final String socketSendBufferSizeName = prefix + "SO_SNDBUF";
+  public static final String socketKeepAliveName = prefix + "SO_KEEPALIVE";
+  public static final String tcpNoDelayName = prefix + "TCP_NODELAY";
 
+  private static final int defaultPort = 8080;
+  private static final int defaultSleep = 10;
   private static final int defaultMessageCount = 1000000;
   private static final int defaultMessageSize = 256;
+  private static final long GIGABYTE = 0x40000000;
+  private static final long defaultBytesCount = GIGABYTE;
+  private static final int defaultReceiveBufferSize = 0x10000;
+  private static final int defaultSendBufferSize = 0x10000;
 
   private static final CompositeConfiguration configuration = new CompositeConfiguration();
 
@@ -41,16 +57,26 @@ public class BenchmarkConfiguration
     configuration.addConfiguration(new EnvironmentConfiguration());
     try {
       configuration.addConfiguration(new PropertiesConfiguration("benchmark.properties"));
-    }
-    catch (ConfigurationException e) {
+    } catch (ConfigurationException e) {
       logger.warn("", e);
     }
   }
 
+  public static final int port = getInt(portName, defaultPort);
+  public static final long sleep = getInt(sleepName, defaultSleep);
   public static final int messageCount = getInt(messageCountName, defaultMessageCount);
   public static final int messageSize = getInt(messageSizeName, defaultMessageSize);
+  public static final long bytesCount = configuration.getLong(bytesCountName, defaultBytesCount);
+  public static final int receiveBufferSize = getInt(receiveBufferSizeName, defaultReceiveBufferSize);
+  public static final int sendBufferSize = getInt(sendBufferSizeName, defaultSendBufferSize);
 
-  private static int getInt(final String key, final int defaultValue) {
+  public static final Integer SO_RCVBUF = configuration.getInteger(socketReceiveBufferSizeName, null);
+  public static final Integer SO_SNDBUF = configuration.getInteger(socketSendBufferSizeName, null);
+  public static final Boolean SO_KEEPALIVE = configuration.getBoolean(socketKeepAliveName, null);
+  public static final Boolean TCP_NODELAY = configuration.getBoolean(tcpNoDelayName, null);
+
+  private static int getInt(final String key, final int defaultValue)
+  {
     return configuration.getInt(key, defaultValue);
   }
 
