@@ -22,6 +22,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
+import org.jctools.queues.SpscArrayQueue;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +91,8 @@ public abstract class AbstractClient implements ClientListener
   protected final CircularBuffer<CircularBuffer<Slice>> bufferOfBuffers;
   protected final CircularBuffer<Slice> freeBuffer;
   protected CircularBuffer<Slice> sendBuffer4Offers, sendBuffer4Polls;
+  protected SpscArrayQueue<Slice> sendBuffer;
+  private final SpscArrayQueue<Slice> sliceSpscArrayQueue;
   protected final ByteBuffer writeBuffer;
   protected boolean write = true;
   /*
@@ -109,12 +113,12 @@ public abstract class AbstractClient implements ClientListener
 
   public AbstractClient(int sendBufferSize)
   {
-    this(8 * 1 * 1024, sendBufferSize);
+    this(64 * 1024, sendBufferSize);
   }
 
   public AbstractClient()
   {
-    this(8 * 1 * 1024, 1024);
+    this(64 * 1024, 1024);
   }
 
   public AbstractClient(ByteBuffer writeBuffer, int sendBufferSize)
@@ -138,6 +142,8 @@ public abstract class AbstractClient implements ClientListener
     }
     sendBuffer4Polls = sendBuffer4Offers = new CircularBuffer<Slice>(sendBufferSize, 10);
     freeBuffer = new CircularBuffer<Slice>(sendBufferSize, 10);
+    sendBuffer = new SpscArrayQueue<Slice>(sendBufferSize);
+    sliceSpscArrayQueue = new SpscArrayQueue<Slice>(sendBufferSize);
   }
 
   @Override
@@ -245,88 +251,44 @@ public abstract class AbstractClient implements ClientListener
     /*
      * at first when we enter this function, our buffer is in fill mode.
      */
-    int remaining, size;
-    if ((size = sendBuffer4Polls.size()) > 0 && (remaining = writeBuffer.remaining()) > 0) {
-      do {
-        Slice f = sendBuffer4Polls.peekUnsafe();
-        if (remaining < f.length) {
-          writeBuffer.put(f.buffer, f.offset, remaining);
-          f.offset += remaining;
-          f.length -= remaining;
-          break;
-        }
-        else {
-          writeBuffer.put(f.buffer, f.offset, f.length);
-          remaining -= f.length;
-          freeBuffer.offer(sendBuffer4Polls.pollUnsafe());
-        }
-      }
-      while (--size > 0);
+    int remaining = writeBuffer.remaining();
+    if (remaining == 0) {
+      channelWrite();
+      return;
     }
-
-    /*
-     * switch to the read mode!
-     */
-    writeBuffer.flip();
-
-    SocketChannel channel = (SocketChannel)key.channel();
-    while ((remaining = writeBuffer.remaining()) > 0) {
-      remaining -= channel.write(writeBuffer);
-      if (remaining > 0) {
-        /*
-         * switch back to the fill mode.
-         */
-        writeBuffer.compact();
-        return;
-      }
-      else if (size > 0) {
-        /*
-         * switch back to the write mode.
-         */
-        writeBuffer.clear();
-
-        remaining = writeBuffer.capacity();
-        do {
-          Slice f = sendBuffer4Polls.peekUnsafe();
-          if (remaining < f.length) {
-            writeBuffer.put(f.buffer, f.offset, remaining);
-            f.offset += remaining;
-            f.length -= remaining;
-            break;
-          }
-          else {
-            writeBuffer.put(f.buffer, f.offset, f.length);
-            remaining -= f.length;
-            freeBuffer.offer(sendBuffer4Polls.pollUnsafe());
-          }
-        }
-        while (--size > 0);
-
-        /*
-         * switch to the read mode.
-         */
-        writeBuffer.flip();
-      }
-    }
-
-    /*
-     * switch back to fill mode.
-     */
-    writeBuffer.clear();
-    synchronized (bufferOfBuffers) {
-      if (sendBuffer4Polls.isEmpty()) {
-        if (sendBuffer4Offers == sendBuffer4Polls) {
+    Slice f = sendBuffer.peek();
+    if (f == null) {
+      synchronized (sendBuffer) {
+        f = sendBuffer.peek();
+        if (f == null) {
           key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
           write = false;
-        }
-        else if (bufferOfBuffers.isEmpty()) {
-          sendBuffer4Polls = sendBuffer4Offers;
-        }
-        else {
-          sendBuffer4Polls = bufferOfBuffers.pollUnsafe();
+          return;
         }
       }
     }
+    do {
+      if (remaining < f.length) {
+        writeBuffer.put(f.buffer, f.offset, remaining);
+        f.offset += remaining;
+        f.length -= remaining;
+        channelWrite();
+        return;
+      } else {
+        writeBuffer.put(f.buffer, f.offset, f.length);
+        remaining -= f.length;
+        sliceSpscArrayQueue.offer(sendBuffer.poll());
+      }
+    } while ((f = sendBuffer.peek()) != null);
+    channelWrite();
+  }
+
+  private void channelWrite() throws IOException
+  {
+    writeBuffer.flip();
+    final SocketChannel channel = (SocketChannel)key.channel();
+    channel.write(writeBuffer);
+    writeBuffer.compact();
   }
 
   public boolean send(byte[] array)
@@ -340,19 +302,18 @@ public abstract class AbstractClient implements ClientListener
       NetletThrowable.Util.throwRuntime(throwables.pollUnsafe());
     }
 
-    Slice f;
-    if (freeBuffer.isEmpty()) {
+    Slice f = sliceSpscArrayQueue.poll();
+    if (f == null) {
       f = new Slice(array, offset, len);
     }
     else {
-      f = freeBuffer.pollUnsafe();
       f.buffer = array;
       f.offset = offset;
       f.length = len;
     }
 
-    if (sendBuffer4Offers.offer(f)) {
-      synchronized (bufferOfBuffers) {
+    if (sendBuffer.offer(f)) {
+      synchronized (sendBuffer) {
         if (!write) {
           key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
           write = true;
@@ -361,28 +322,6 @@ public abstract class AbstractClient implements ClientListener
       }
 
       return true;
-    }
-
-    if (!throwables.isEmpty()) {
-      NetletThrowable.Util.throwRuntime(throwables.pollUnsafe());
-    }
-
-    if (sendBuffer4Offers.capacity() != MAX_SENDBUFFER_SIZE) {
-      synchronized (bufferOfBuffers) {
-        if (sendBuffer4Offers != sendBuffer4Polls) {
-          bufferOfBuffers.add(sendBuffer4Offers);
-        }
-
-        sendBuffer4Offers = new CircularBuffer<Slice>(sendBuffer4Offers.capacity() << 1);
-        sendBuffer4Offers.add(f);
-        if (!write) {
-          key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-          write = true;
-          key.selector().wakeup();
-        }
-
-        return true;
-      }
     }
 
     return false;
@@ -402,14 +341,13 @@ public abstract class AbstractClient implements ClientListener
   @Override
   public void unregistered(SelectionKey key)
   {
-    synchronized (bufferOfBuffers) {
-      final CircularBuffer<Slice> SEND_BUFFER = sendBuffer4Offers;
-      sendBuffer4Offers = new CircularBuffer<Slice>(0)
+      final SpscArrayQueue<Slice> SEND_BUFFER = sendBuffer;
+      sendBuffer = new SpscArrayQueue<Slice>(0)
       {
         @Override
         public boolean isEmpty()
         {
-          return SEND_BUFFER.isEmpty();
+          return SEND_BUFFER.peek() == null;
         }
 
         @Override
@@ -425,19 +363,18 @@ public abstract class AbstractClient implements ClientListener
         }
 
         @Override
-        public Slice pollUnsafe()
+        public Slice poll()
         {
-          return SEND_BUFFER.pollUnsafe();
+          return SEND_BUFFER.poll();
         }
 
         @Override
-        public Slice peekUnsafe()
+        public Slice peek()
         {
-          return SEND_BUFFER.peekUnsafe();
+          return SEND_BUFFER.peek();
         }
 
       };
-    }
   }
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractClient.class);

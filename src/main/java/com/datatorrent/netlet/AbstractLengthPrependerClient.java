@@ -192,7 +192,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
 
   public boolean write(byte[] message1, byte[] message2)
   {
-    if (sendBuffer4Offers.remainingCapacity() < 3 && sendBuffer4Offers.capacity() == MAX_SENDBUFFER_SIZE) {
+    if (sendBuffer.size() + 3 > sendBuffer.capacity()) {
       return false;
     }
 
@@ -208,12 +208,12 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
         return true;
       }
 
-      logger.debug("Exiting sendBuffer for Offers = {}, socket = {}", sendBuffer4Offers, key.channel());
+      logger.debug("Exiting sendBuffer for Offers = {}, socket = {}", sendBuffer, key.channel());
       System.exit(0);
       throw new IllegalStateException("Only partial data could be written!");
     }
 
-    logger.debug("sendBuffer for Offers = {}, socket = {}", sendBuffer4Offers, key.channel());
+    logger.debug("sendBuffer for Offers = {}, socket = {}", sendBuffer, key.channel());
     return false;
   }
 
@@ -223,7 +223,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
 
   public boolean write(byte[] message, int offset, int size)
   {
-    if (sendBuffer4Offers.remainingCapacity() < 2 && sendBuffer4Offers.capacity() == MAX_SENDBUFFER_SIZE) {
+    if (sendBuffer.size() + 2 > sendBuffer.capacity()) {
       return false;
     }
 
@@ -239,7 +239,7 @@ public abstract class AbstractLengthPrependerClient extends AbstractClient
         return true;
       }
 
-      logger.debug("Exiting sendBuffer for Offers = {}, socket = {}", sendBuffer4Offers, key.channel());
+      logger.debug("Exiting sendBuffer for Offers = {}, socket = {}", sendBuffer, key.channel());
       System.exit(0);
       throw new IllegalStateException("Only partial data could be written!");
     }

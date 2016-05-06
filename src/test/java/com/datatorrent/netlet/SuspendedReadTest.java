@@ -26,6 +26,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.lang.Thread.sleep;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -92,11 +94,12 @@ public class SuspendedReadTest
     eventLoop.connect(new InetSocketAddress("localhost", 5035), client);
     byte[] data = new byte[1024];
     int i = 0;
-    while(client.send(data))
-    {
+    while (client.send(data)) {
       i++;
+      sleep(1);
     }
     logger.debug("sent {} KB of data.", i);
+    sleep(5);
     assertFalse(client.send(data));
   }
 }
