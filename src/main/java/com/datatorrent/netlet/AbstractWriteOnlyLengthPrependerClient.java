@@ -18,11 +18,16 @@ package com.datatorrent.netlet;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.datatorrent.netlet.util.Slice;
 import com.datatorrent.netlet.util.VarInt;
 
 public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyClient
 {
+  private static final Logger logger = LoggerFactory.getLogger(AbstractWriteOnlyLengthPrependerClient.class);
+
   private boolean newMessage = true;
 
   public AbstractWriteOnlyLengthPrependerClient(final int sendBufferCapacity)
@@ -34,7 +39,6 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
   {
     super(writeBufferCapacity, sendBufferCapacity);
   }
-
 
   @Override
   public void write() throws IOException
@@ -52,6 +56,7 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
       synchronized (sendQueue) {
         f = sendQueue.peek();
         if (f == null) {
+          logger.info("{} OP_WRITE disable", this);
           key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
           write = false;
           return;
