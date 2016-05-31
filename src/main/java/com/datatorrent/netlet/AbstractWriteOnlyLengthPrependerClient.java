@@ -48,8 +48,7 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
      */
     int remaining = writeBuffer.remaining();
     if (remaining == 0) {
-      channelWrite();
-      return;
+      remaining = channelWrite();
     }
     Slice f = sendQueue.peek();
     if (f == null) {
@@ -66,19 +65,22 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
     do {
       if (newMessage) {
         if (remaining < 5) {
-          channelWrite();
-          return;
-        } else {
-          remaining -= VarInt.write(f.length, writeBuffer);
-          newMessage = false;
+          remaining = channelWrite();
+          if (remaining < 5) {
+            return;
+          }
         }
+        remaining -= VarInt.write(f.length, writeBuffer);
+        newMessage = false;
       }
       if (remaining < f.length) {
         writeBuffer.put(f.buffer, f.offset, remaining);
         f.offset += remaining;
         f.length -= remaining;
-        channelWrite();
-        return;
+        remaining = channelWrite();
+        if (remaining < 5) {
+          return;
+        }
       } else {
         writeBuffer.put(f.buffer, f.offset, f.length);
         remaining -= f.length;

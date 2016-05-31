@@ -109,12 +109,12 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     channelWrite();
   }
 
-  protected void channelWrite() throws IOException
+  protected int channelWrite() throws IOException
   {
     writeBuffer.flip();
     final SocketChannel channel = (SocketChannel)key.channel();
     channel.write(writeBuffer);
-    writeBuffer.compact();
+    return writeBuffer.compact().remaining();
   }
 
   public boolean send(byte[] array)
