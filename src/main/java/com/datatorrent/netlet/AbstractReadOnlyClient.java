@@ -16,7 +16,9 @@
 package com.datatorrent.netlet;
 
 import java.io.IOException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.nio.channels.NetworkChannel;
 import java.nio.channels.SocketChannel;
 
 import org.slf4j.Logger;
@@ -36,6 +38,11 @@ public abstract class AbstractReadOnlyClient extends AbstractClientListener
     super.connected();
     shutdownIO(false);
     suspendWriteIfResumed();
+    try {
+      ((NetworkChannel)key.channel()).setOption(StandardSocketOptions.TCP_NODELAY, false);
+    } catch (IOException e) {
+      logger.warn("{}", this, e);
+    }
   }
 
   @Override
