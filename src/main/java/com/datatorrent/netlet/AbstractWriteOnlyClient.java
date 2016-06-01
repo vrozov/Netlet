@@ -34,7 +34,6 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
   protected final SpscArrayQueue<Slice> sendQueue;
   protected final SpscArrayQueue<Slice> freeQueue;
   protected boolean write = true;
-  private boolean logged = false;
 
   public AbstractWriteOnlyClient()
   {
@@ -140,10 +139,8 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     }
 
     if (sendQueue.offer(f)) {
-      logged = false;
       synchronized (sendQueue) {
         if (!write) {
-          logger.info("{} OP_WRITE enable", this);
           key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
           write = true;
           key.selector().wakeup();
@@ -152,10 +149,6 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
       return true;
     }
 
-    if (!logged) {
-      logged = true;
-      logger.info("{} send queue {} full", this, sendQueue.size());
-    }
     return false;
   }
 }

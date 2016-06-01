@@ -55,7 +55,6 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
       synchronized (sendQueue) {
         f = sendQueue.peek();
         if (f == null) {
-          logger.info("{} OP_WRITE disable", this);
           key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
           write = false;
           return;
