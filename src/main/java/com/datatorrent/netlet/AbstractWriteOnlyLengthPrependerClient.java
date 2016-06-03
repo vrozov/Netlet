@@ -82,6 +82,7 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
         }
       } else {
         writeBuffer.put(f.buffer, f.offset, f.length);
+        f.buffer = null;
         remaining -= f.length;
         freeQueue.offer(sendQueue.poll());
         newMessage = true;

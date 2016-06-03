@@ -101,6 +101,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
         return;
       } else {
         writeBuffer.put(f.buffer, f.offset, f.length);
+        f.buffer = null;
         remaining -= f.length;
         freeQueue.offer(sendQueue.poll());
       }
@@ -133,6 +134,9 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     if (f == null) {
       f = new Slice(array, offset, len);
     } else {
+      if (f.buffer != null) {
+        throw new RuntimeException("Unexpected slice " + f.toString());
+      }
       f.buffer = array;
       f.offset = offset;
       f.length = len;
