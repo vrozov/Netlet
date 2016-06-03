@@ -18,8 +18,6 @@ package com.datatorrent.netlet;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.StandardSocketOptions;
-import java.nio.channels.NetworkChannel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -200,11 +198,6 @@ public abstract class AbstractClientListener implements ClientListener
   @Override
   public void connected()
   {
-    try {
-      ((NetworkChannel)key.channel()).setOption(StandardSocketOptions.TCP_NODELAY, false);
-    } catch (IOException e) {
-      logger.warn("{}", this, e);
-    }
     logger.debug("{}", key.channel());
   }
 

@@ -137,7 +137,11 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
       f.offset = offset;
       f.length = len;
     }
+    return send(f);
+  }
 
+  public boolean send(Slice f)
+  {
     if (sendQueue.offer(f)) {
       synchronized (sendQueue) {
         if (!write) {
