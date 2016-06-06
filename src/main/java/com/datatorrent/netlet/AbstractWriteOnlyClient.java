@@ -90,6 +90,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
         if (channelWrite() == 0) {
           return;
         }
+        remaining = writeBuffer.remaining();
       } else {
         writeBuffer.put(slice.buffer, slice.offset, slice.length);
         slice.buffer = null;
@@ -108,9 +109,12 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
       final int write = channel.write(writeBuffer);
       if (write > 0) {
         writeBuffer.compact();
+      } else {
+        writeBuffer.clear();
       }
       return write;
     } else {
+      writeBuffer.clear();
       try {
         lock.lock();
         suspendWriteIfResumed();
