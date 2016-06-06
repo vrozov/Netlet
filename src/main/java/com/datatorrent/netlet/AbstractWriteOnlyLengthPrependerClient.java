@@ -16,7 +16,6 @@
 package com.datatorrent.netlet;
 
 import java.io.IOException;
-import java.nio.channels.SelectionKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,47 +46,31 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
      * at first when we enter this function, our buffer is in fill mode.
      */
     int remaining = writeBuffer.remaining();
-    if (remaining == 0) {
-      remaining = channelWrite();
-    }
-    Slice f = sendQueue.peek();
-    if (f == null) {
-      synchronized (sendQueue) {
-        f = sendQueue.peek();
-        if (f == null) {
-          key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
-          write = false;
+    Slice slice;
+    while ((slice = sendQueue.peek()) != null) {
+      if (newMessage) {
+        if (remaining < 5 && (channelWrite() == 0 || (remaining = writeBuffer.remaining()) < 5)) {
           return;
         }
-      }
-    }
-    do {
-      if (newMessage) {
-        if (remaining < 5) {
-          remaining = channelWrite();
-          if (remaining < 5) {
-            return;
-          }
-        }
-        remaining -= VarInt.write(f.length, writeBuffer);
+        remaining -= VarInt.write(slice.length, writeBuffer);
         newMessage = false;
       }
-      if (remaining < f.length) {
-        writeBuffer.put(f.buffer, f.offset, remaining);
-        f.offset += remaining;
-        f.length -= remaining;
-        remaining = channelWrite();
-        if (remaining < 5) {
+      if (remaining < slice.length) {
+        writeBuffer.put(slice.buffer, slice.offset, remaining);
+        slice.offset += remaining;
+        slice.length -= remaining;
+        if (channelWrite() == 0) {
           return;
         }
+        remaining = writeBuffer.remaining();
       } else {
-        writeBuffer.put(f.buffer, f.offset, f.length);
-        f.buffer = null;
-        remaining -= f.length;
+        writeBuffer.put(slice.buffer, slice.offset, slice.length);
+        slice.buffer = null;
+        remaining -= slice.length;
         freeQueue.offer(sendQueue.poll());
         newMessage = true;
       }
-    } while ((f = sendQueue.peek()) != null);
+    }
     channelWrite();
   }
 }

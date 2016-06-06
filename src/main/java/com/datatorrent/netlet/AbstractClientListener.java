@@ -105,10 +105,9 @@ public abstract class AbstractClientListener implements ClientListener
   {
     final int interestOps = key.interestOps();
     if ((interestOps & ops) == 0) {
-      key.interestOps(interestOps | ops);
+      key.interestOps(interestOps | ops).selector().wakeup();
       logger.debug("{} resumed {} on channel, key={}, attachment={}", this,
           ops == SelectionKey.OP_READ ? "read" : "write", key.channel(), key, key.attachment());
-      key.selector().wakeup();
       return true;
     } else {
       return false;

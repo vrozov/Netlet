@@ -17,8 +17,9 @@ package com.datatorrent.netlet;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.jctools.queues.SpscArrayQueue;
 import org.slf4j.Logger;
@@ -33,7 +34,8 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
   protected final ByteBuffer writeBuffer;
   protected final SpscArrayQueue<Slice> sendQueue;
   protected final SpscArrayQueue<Slice> freeQueue;
-  protected boolean write = true;
+  protected boolean isWriteEnabled = true;
+  protected Lock lock = new ReentrantLock();
 
   public AbstractWriteOnlyClient()
   {
@@ -77,44 +79,47 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
      * at first when we enter this function, our buffer is in fill mode.
      */
     int remaining = writeBuffer.remaining();
-    if (remaining == 0) {
-      channelWrite();
-      return;
-    }
-    Slice f = sendQueue.peek();
-    if (f == null) {
-      synchronized (sendQueue) {
-        f = sendQueue.peek();
-        if (f == null) {
-          key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
-          write = false;
+    Slice slice;
+    while ((slice = sendQueue.peek()) != null) {
+      if (remaining < slice.length) {
+        if (remaining > 0) {
+          writeBuffer.put(slice.buffer, slice.offset, remaining);
+          slice.offset += remaining;
+          slice.length -= remaining;
+        }
+        if (channelWrite() == 0) {
           return;
         }
-      }
-    }
-    do {
-      if (remaining < f.length) {
-        writeBuffer.put(f.buffer, f.offset, remaining);
-        f.offset += remaining;
-        f.length -= remaining;
-        channelWrite();
-        return;
       } else {
-        writeBuffer.put(f.buffer, f.offset, f.length);
-        f.buffer = null;
-        remaining -= f.length;
+        writeBuffer.put(slice.buffer, slice.offset, slice.length);
+        slice.buffer = null;
+        remaining -= slice.length;
         freeQueue.offer(sendQueue.poll());
       }
-    } while ((f = sendQueue.peek()) != null);
+    }
     channelWrite();
   }
 
   protected int channelWrite() throws IOException
   {
     writeBuffer.flip();
-    final SocketChannel channel = (SocketChannel)key.channel();
-    channel.write(writeBuffer);
-    return writeBuffer.compact().remaining();
+    if (writeBuffer.remaining() > 0) {
+      final SocketChannel channel = (SocketChannel)key.channel();
+      final int write = channel.write(writeBuffer);
+      if (write > 0) {
+        writeBuffer.compact();
+      }
+      return write;
+    } else {
+      try {
+        lock.lock();
+        suspendWriteIfResumed();
+        isWriteEnabled = false;
+      } finally {
+        lock.unlock();
+      }
+      return 0;
+    }
   }
 
   public boolean send(byte[] array)
@@ -147,16 +152,17 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
   public boolean send(Slice f)
   {
     if (sendQueue.offer(f)) {
-      synchronized (sendQueue) {
-        if (!write) {
-          key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-          write = true;
-          key.selector().wakeup();
+      try {
+        lock.lock();
+        if (!isWriteEnabled) {
+          isWriteEnabled = true;
+          resumeWriteIfSuspended();
         }
+      } finally {
+        lock.unlock();
       }
       return true;
     }
-
     return false;
   }
 }
