@@ -17,6 +17,7 @@ package com.datatorrent.netlet;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -32,7 +33,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
   private static final Logger logger = LoggerFactory.getLogger(AbstractWriteOnlyClient.class);
 
   protected final ByteBuffer writeBuffer;
-  protected final SpscArrayQueue<Slice> sendQueue;
+  protected SpscArrayQueue<Slice> sendQueue;
   protected final SpscArrayQueue<Slice> freeQueue;
   protected boolean isWriteEnabled = true;
   protected Lock lock = new ReentrantLock();
@@ -60,6 +61,38 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     super.connected();
     shutdownIO(true);
     suspendReadIfResumed();
+  }
+
+  @Override
+  public void unregistered(SelectionKey key)
+  {
+    try {
+      lock.lock();
+      final SpscArrayQueue<Slice> sendQueue = this.sendQueue;
+      this.sendQueue = new SpscArrayQueue<Slice>(sendQueue.capacity())
+      {
+        @Override
+        public boolean offer(Slice f)
+        {
+          throw new RuntimeException("Client " + this + " does not accept new data.");
+        }
+
+        @Override
+        public Slice peek() {
+          return sendQueue.peek();
+        }
+
+        @Override
+        public Slice poll() {
+          return sendQueue.poll();
+        }
+      };
+      if (sendQueue.peek() == null && !isWriteEnabled) {
+        super.unregistered(key);
+      }
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
