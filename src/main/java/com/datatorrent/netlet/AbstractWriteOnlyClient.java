@@ -106,11 +106,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     if (writeBuffer.flip().remaining() > 0) {
       final SocketChannel channel = (SocketChannel)key.channel();
       final int write = channel.write(writeBuffer);
-      if (write > 0) {
-        writeBuffer.compact();
-      } else {
-        writeBuffer.clear();
-      }
+      writeBuffer.compact();
       return write;
     } else {
       writeBuffer.clear();
