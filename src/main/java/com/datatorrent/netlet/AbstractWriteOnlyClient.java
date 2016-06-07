@@ -78,12 +78,14 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
         }
 
         @Override
-        public Slice peek() {
+        public Slice peek()
+        {
           return sendQueue.peek();
         }
 
         @Override
-        public Slice poll() {
+        public Slice poll()
+        {
           return sendQueue.poll();
         }
       };
