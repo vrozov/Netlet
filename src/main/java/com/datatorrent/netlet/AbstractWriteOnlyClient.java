@@ -81,7 +81,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
     int remaining = writeBuffer.remaining();
     Slice slice;
     while ((slice = sendQueue.peek()) != null) {
-      if (remaining < slice.length) {
+      while (remaining < slice.length) {
         if (remaining > 0) {
           writeBuffer.put(slice.buffer, slice.offset, remaining);
           slice.offset += remaining;
@@ -91,12 +91,11 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
           return;
         }
         remaining = writeBuffer.remaining();
-      } else {
-        writeBuffer.put(slice.buffer, slice.offset, slice.length);
-        slice.buffer = null;
-        remaining -= slice.length;
-        freeQueue.offer(sendQueue.poll());
       }
+      writeBuffer.put(slice.buffer, slice.offset, slice.length);
+      slice.buffer = null;
+      remaining -= slice.length;
+      freeQueue.offer(sendQueue.poll());
     }
     channelWrite();
   }

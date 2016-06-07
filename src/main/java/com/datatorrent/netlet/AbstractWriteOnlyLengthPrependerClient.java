@@ -55,21 +55,22 @@ public class AbstractWriteOnlyLengthPrependerClient extends AbstractWriteOnlyCli
         remaining -= VarInt.write(slice.length, writeBuffer);
         newMessage = false;
       }
-      if (remaining < slice.length) {
-        writeBuffer.put(slice.buffer, slice.offset, remaining);
-        slice.offset += remaining;
-        slice.length -= remaining;
+      while (remaining < slice.length) {
+        if (remaining > 0) {
+          writeBuffer.put(slice.buffer, slice.offset, remaining);
+          slice.offset += remaining;
+          slice.length -= remaining;
+        }
         if (channelWrite() == 0) {
           return;
         }
         remaining = writeBuffer.remaining();
-      } else {
-        writeBuffer.put(slice.buffer, slice.offset, slice.length);
-        slice.buffer = null;
-        remaining -= slice.length;
-        freeQueue.offer(sendQueue.poll());
-        newMessage = true;
       }
+      writeBuffer.put(slice.buffer, slice.offset, slice.length);
+      slice.buffer = null;
+      remaining -= slice.length;
+      freeQueue.offer(sendQueue.poll());
+      newMessage = true;
     }
     channelWrite();
   }
