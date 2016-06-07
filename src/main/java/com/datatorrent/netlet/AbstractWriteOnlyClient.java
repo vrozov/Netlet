@@ -112,8 +112,10 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
       writeBuffer.clear();
       try {
         lock.lock();
-        suspendWriteIfResumed();
-        isWriteEnabled = false;
+        if (sendQueue.peek() == null) {
+          suspendWriteIfResumed();
+          isWriteEnabled = false;
+        }
       } finally {
         lock.unlock();
       }
