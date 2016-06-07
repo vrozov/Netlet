@@ -93,8 +93,8 @@ public abstract class AbstractClientListener implements ClientListener
     final int interestOps = key.interestOps();
     if ((interestOps & ops) == ops) {
       key.interestOps(interestOps & ~ops);
-      logger.debug("{} suspended {} on channel {}, key={}, attachment={}", this,
-          ops == SelectionKey.OP_READ ? "read" : "write", key.channel(), key, key.attachment());
+      logger.debug("{} suspended {} on channel {}, key={}, interestOps={}, attachment={}", this,
+          ops == SelectionKey.OP_READ ? "read" : "write", key.channel(), key, key.interestOps(), key.attachment());
       return true;
     } else {
       return false;
@@ -106,8 +106,8 @@ public abstract class AbstractClientListener implements ClientListener
     final int interestOps = key.interestOps();
     if ((interestOps & ops) == 0) {
       key.interestOps(interestOps | ops).selector().wakeup();
-      logger.debug("{} resumed {} on channel, key={}, attachment={}", this,
-          ops == SelectionKey.OP_READ ? "read" : "write", key.channel(), key, key.attachment());
+      logger.debug("{} resumed {} on channel, key={}, interestOps={}, attachment={}", this,
+          ops == SelectionKey.OP_READ ? "read" : "write", key.channel(), key, key.interestOps(), key.attachment());
       return true;
     } else {
       return false;

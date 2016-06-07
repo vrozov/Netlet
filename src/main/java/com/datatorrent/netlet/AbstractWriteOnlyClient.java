@@ -103,8 +103,7 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
 
   protected int channelWrite() throws IOException
   {
-    writeBuffer.flip();
-    if (writeBuffer.remaining() > 0) {
+    if (writeBuffer.flip().remaining() > 0) {
       final SocketChannel channel = (SocketChannel)key.channel();
       final int write = channel.write(writeBuffer);
       if (write > 0) {
@@ -159,8 +158,8 @@ public class AbstractWriteOnlyClient extends AbstractClientListener
       try {
         lock.lock();
         if (!isWriteEnabled) {
-          isWriteEnabled = true;
           resumeWriteIfSuspended();
+          isWriteEnabled = true;
         }
       } finally {
         lock.unlock();
